@@ -1,0 +1,85 @@
+const movementTypes = [
+    {
+        id: 'infantry',
+        name: 'Infantry',
+        description:
+            'Travels by foot and is the most versatile movement type, with no major strengths or weaknesses.',
+        movement: 5,
+        roughTerrainCost: 2,
+        canTraverseDifficultTerrain: false,
+        ignoresTerrainBonuses: false,
+        ignoresTerrainPenalties: false,
+        baseAid: 2,
+        traits: [],
+        supportType: null,
+        supportTypeChoice: true,
+        bonusSkillType: 'choice',
+        bonusSkills: [
+            'Shove',
+            'Reposition',
+            'Swap',
+            'Draw Back',
+            'Pivot',
+        ],
+        skillLevelOffset: 0,
+    },
+
+    {
+        id: 'cavalry',
+        name: 'Cavalry',
+        description:
+            'Travels using a land-based mount or similar form and has the highest movement, but is hindered heavily by terrain.',
+        movement: 7,
+        roughTerrainCost: 3,
+        canTraverseDifficultTerrain: false,
+        ignoresTerrainBonuses: false,
+        ignoresTerrainPenalties: false,
+        baseAid: 4,
+        traits: ['Furred'],
+        supportType: 'cavalry',
+        supportTypeChoice: false,
+        bonusSkillType: 'fixed',
+        bonusSkills: ['Canter'],
+        skillLevelOffset: 0,
+    },
+
+    {
+        id: 'flier',
+        name: 'Flier',
+        description:
+            'Travels through the air and can cross terrain freely, but does not receive terrain-based bonuses or penalties.',
+        movement: 6,
+        roughTerrainCost: 1,
+        canTraverseDifficultTerrain: true,
+        ignoresTerrainBonuses: true,
+        ignoresTerrainPenalties: true,
+        baseAid: 4,
+        traits: ['Winged'],
+        supportType: 'flier',
+        supportTypeChoice: false,
+        bonusSkillType: 'fixed',
+        bonusSkills: ['Canter'],
+        skillLevelOffset: 0,
+    },
+
+    {
+        id: 'armor',
+        name: 'Armor',
+        description:
+            'A heavily armored or naturally massive unit with strong defensive potential but reduced mobility.',
+        movement: 4,
+        roughTerrainCost: 2,
+        canTraverseDifficultTerrain: false,
+        ignoresTerrainBonuses: false,
+        ignoresTerrainPenalties: false,
+        baseAid: 2,
+        traits: ['Scaled'],
+        supportType: 'armor',
+        supportTypeChoice: false,
+        bonusSkillType: 'choice',
+        bonusSkills: ['Shove', 'Smite'],
+        skillLevelOffset: 5,
+    },
+];
+
+export default movementTypes;
