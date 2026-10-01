@@ -1,118 +1,349 @@
-const createCharacter = () => ({
-    // Identity
-    id: crypto.randomUUID(),
-    characterType: 'player',
-    name: '',
-    playerName: '',
+const createEmptyCombatStats = () => ({
+    hp: {
+        base: 15,
+        levelUp: 0,
+        temporary: 0,
+    },
+
+    attack: {
+        base: 3,
+        levelUp: 0,
+        temporary: 0,
+    },
+
+    defense: {
+        base: 3,
+        levelUp: 0,
+        temporary: 0,
+    },
+
+    dexterity: {
+        base: 3,
+        levelUp: 0,
+        temporary: 0,
+    },
+
+    speed: {
+        base: 3,
+        levelUp: 0,
+        temporary: 0,
+    },
+
+    resistance: {
+        base: 3,
+        levelUp: 0,
+        temporary: 0,
+    },
+
+    luck: {
+        base: 3,
+        levelUp: 0,
+        temporary: 0,
+    },
+});
+
+const createEmptyOutOfCombatStats = () => ({
+    strength: 0,
+    intellect: 0,
+    perception: 0,
+    charisma: 0,
+});
+
+const createEmptySkillSlots = () => ({
+    movement: null,
+    level1: null,
+    level5: null,
+    level10: null,
+    level15: null,
+    level20: null,
+    level25: null,
+    level30: null,
+});
+
+const createEmptyCharacterInfo = () => ({
     age: '',
     race: '',
     pronouns: '',
     personality: '',
     background: '',
     image: null,
-
-    // Progression
-    level: 1,
-    movementType: null,
-    supportType: null,
-
-    // Weapon access
-    weaponProficiencies: [],
-
-    // Combat stats
-    stats: {
-        base: {
-            hp: 15,
-            attack: 3,
-            defense: 3,
-            dexterity: 3,
-            speed: 3,
-            resistance: 3,
-            luck: 3,
-        },
-
-        levelUp: {
-            hp: 0,
-            attack: 0,
-            defense: 0,
-            dexterity: 0,
-            speed: 0,
-            resistance: 0,
-            luck: 0,
-        },
-
-        temporary: {
-            hp: 0,
-            attack: 0,
-            defense: 0,
-            dexterity: 0,
-            speed: 0,
-            resistance: 0,
-            luck: 0,
-        },
-    },
-
-    // Non-combat stats
-    nonCombatStats: {
-        strength: 0,
-        intellect: 0,
-        perception: 0,
-        charisma: 0,
-    },
-
-    // Current battle/state values
-    currentHP: 15,
-    charge: 0,
-    gauge: null,
-    size: null,
-
-    // Skills
-    skills: {
-        movementSkill: null,
-        levelOneSkill: null,
-        additionalSkills: [],
-    },
-
-    personalSkill: null,
-
-    // Weapons
-    weapons: [],
-    equippedWeaponId: null,
-
-    // General inventory
-    inventory: [],
-
-    // Current conditions
-    status: null,
-    terrain: null,
-    isEffective: false,
-    isRescuing: false,
-    isSupported: false,
-    isTransformed: false,
-
-    // Support currently being used
-    activeSupportId: null,
-
-    // Character support relationships
-    supports: [],
-
-    // Currency
-    gold: {
-        current: 1000,
-        transactions: [
-            {
-                id: crypto.randomUUID(),
-                type: 'income',
-                amount: 1000,
-                source: 'Starting Gold',
-            },
-        ],
-    },
-
-    // Optional campaign rules
-    optionalRules: {
-        connectedStatCaps: false,
-    },
 });
 
-export default createCharacter;
+const createEmptyInventory = () => [];
+
+const createEmptySupportRelationships = () => [];
+
+const createEmptyGoldHistory = () => [];
+
+export default function createCharacter() {
+    return {
+        // =====================================================
+        // IDENTITY
+        // =====================================================
+
+        id: null,
+
+        characterType: 'player',
+
+        name: '',
+
+        playerName: '',
+
+        level: 1,
+
+        // =====================================================
+        // MOVEMENT
+        // =====================================================
+
+        movementType: null,
+
+        /*
+          Infantry chooses its support type.
+          Other movement types will normally determine this
+          automatically through their movement data.
+        */
+        supportType: null,
+
+        // =====================================================
+        // WEAPON PROFICIENCIES
+        // =====================================================
+
+        /*
+          Weapon type IDs, for example:
+    
+          ['sword']
+          ['sword', 'bow']
+        */
+        weaponProficiencies: [],
+
+        // =====================================================
+        // WEAPONS
+        // =====================================================
+
+        /*
+          Every carried weapon has this general structure:
+    
+          {
+            id: 'unique-id',
+            name: 'Custom Weapon Name',
+            baseWeaponId: 'iron-sword',
+            refinements: [
+              'steel',
+              'long',
+            ],
+          }
+    
+          The weapon's base Might, Range, weapon type, innate
+          attributes, etc. come from baseWeapons.js.
+    
+          Refinement definitions come from weaponRefinements.js.
+        */
+        weapons: [],
+
+        /*
+          References the ID of an entry in weapons[].
+    
+          We do NOT duplicate the equipped weapon object here.
+        */
+        equippedWeaponId: null,
+
+        // =====================================================
+        // TRANSFORMATION
+        // =====================================================
+
+        /*
+          This is the ONLY transformation state stored on the
+          character.
+    
+          0 = not transformed
+          1-4 = transformed with that current Gauge
+    
+          The sheet does not automatically reduce Gauge.
+        */
+        transformationGauge: 0,
+
+        // =====================================================
+        // COMBAT STATS
+        // =====================================================
+
+        combatStats: createEmptyCombatStats(),
+
+        /*
+          Current HP is separate from the HP stat itself.
+    
+          The combatStats.hp values determine maximum HP.
+          currentHp records the character's current state.
+    
+          null allows the UI to initialize it to calculated
+          maximum HP when appropriate.
+        */
+        currentHp: null,
+
+        /*
+          Charge is manually controlled by the player.
+          The sheet does not automatically gain or spend it.
+        */
+        charge: 0,
+
+        // =====================================================
+        // OUT-OF-COMBAT STATS
+        // =====================================================
+
+        outOfCombatStats: createEmptyOutOfCombatStats(),
+
+        // =====================================================
+        // SIZE
+        // =====================================================
+
+        /*
+          1 = Small
+          2 = Medium
+          3 = Large
+          4+ = Extra Large
+    
+          Transformation may add +2 Total Size through the
+          calculation rules, but the selected Size itself does
+          not change.
+        */
+        size: 2,
+
+        // =====================================================
+        // STATUS
+        // =====================================================
+
+        /*
+          Current Status is selected manually.
+    
+          We can replace this with a specific default Status ID
+          once the Status data file is finalized.
+        */
+        status: null,
+
+        // =====================================================
+        // TERRAIN
+        // =====================================================
+
+        /*
+          Terrain is selected manually.
+    
+          Additional terrain definitions can be added later
+          without changing the character model.
+        */
+        terrain: null,
+
+        // =====================================================
+        // SITUATIONAL CONTROLS
+        // =====================================================
+
+        /*
+          These are sheet controls rather than combat automation.
+    
+          Effective tells the sheet to apply the x3 Might rule.
+    
+          Rescuing can be used by later calculations/display
+          rules where appropriate.
+        */
+        situational: {
+            effective: false,
+            rescuing: false,
+        },
+
+        // =====================================================
+        // SKILLS
+        // =====================================================
+
+        skillSlots: createEmptySkillSlots(),
+
+        /*
+          Useful for any skills that do not belong in the normal
+          milestone slots, including future homebrew support.
+        */
+        additionalSkills: [],
+
+        // =====================================================
+        // PERSONAL SKILL
+        // =====================================================
+
+        /*
+          Personal Skills are optional and subject to GM
+          approval in tabletop play.
+    
+          The builder records the skill but does not attempt to
+          enforce GM approval.
+        */
+        personalSkill: null,
+
+        // =====================================================
+        // INVENTORY
+        // =====================================================
+
+        inventory: createEmptyInventory(),
+
+        // =====================================================
+        // GOLD
+        // =====================================================
+
+        /*
+          Creation will grant 1000 starting Gold.
+    
+          The empty model remains at 0 so that creation rules,
+          rather than the generic model, are responsible for
+          granting starting resources.
+        */
+        gold: 0,
+
+        goldHistory: createEmptyGoldHistory(),
+
+        // =====================================================
+        // SUPPORTS
+        // =====================================================
+
+        /*
+          Example later:
+    
+          {
+            id: 'unique-id',
+            characterName: 'Faye',
+            rank: 'C',
+            supportType: 'flier',
+          }
+    
+          The partner's Support Type determines what bonuses
+          this character receives from them.
+        */
+        supports: createEmptySupportRelationships(),
+
+        // =====================================================
+        // OPTIONAL RULES
+        // =====================================================
+
+        optionalRules: {
+            connectedStatCaps: false,
+            movementTypeSkills: false,
+        },
+
+        // =====================================================
+        // CHARACTER INFORMATION
+        // =====================================================
+
+        characterInfo: createEmptyCharacterInfo(),
+    };
+}
+
+// =========================================================
+// OPTIONAL FACTORY EXPORTS
+// =========================================================
+//
+// These are exported in case character creation forms or
+// reset controls need fresh copies of individual sections.
+// =========================================================
+
+export {
+    createEmptyCombatStats,
+    createEmptyOutOfCombatStats,
+    createEmptySkillSlots,
+    createEmptyCharacterInfo,
+    createEmptyInventory,
+    createEmptySupportRelationships,
+    createEmptyGoldHistory,
+};
