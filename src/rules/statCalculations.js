@@ -1,3 +1,5 @@
+// src/rules/statCalculations.js
+
 import { movementTypes } from '../data/movementTypes';
 
 import {
@@ -8,6 +10,19 @@ import {
     getWeaponDerivedStatBonus,
     getWeaponBaseData,
 } from './weaponCalculations';
+
+import {
+    getTerrainStatBonus,
+} from './terrainCalculations';
+
+import {
+    getStatusStatModifier,
+    getStatusStatOverride,
+} from './statusCalculations';
+
+import {
+    getSupportBonus,
+} from './supportCalculations';
 
 // =========================================================
 // INTERNAL HELPERS
@@ -26,24 +41,6 @@ function getMovementTypeData(movementTypeId) {
         return null;
     }
 
-    /*
-      Supports either:
-  
-      movementTypes = {
-        infantry: {...},
-        cavalry: {...},
-      }
-  
-      OR:
-  
-      movementTypes = [
-        { id: 'infantry', ... },
-        ...
-      ]
-  
-      This keeps the calculation file tolerant of either
-      data-file structure.
-    */
     if (Array.isArray(movementTypes)) {
         return (
             movementTypes.find(
@@ -65,7 +62,10 @@ function getTransformationGauge(character) {
         toNumber(character?.transformationGauge)
     );
 
-    return Math.max(0, Math.min(4, gauge));
+    return Math.max(
+        0,
+        Math.min(4, gauge)
+    );
 }
 
 // =========================================================
@@ -101,9 +101,23 @@ export function getEquippedBaseWeapon(character) {
 // =========================================================
 // PERMANENT STATS
 // =========================================================
+//
+// Permanent:
+//
+// Base + Level Up
+//
+// Temporary bonuses, weapon bonuses, terrain, statuses,
+// and supports do NOT count toward permanent stat caps.
+// =========================================================
 
-export function getPermanentStat(character, stat) {
-    const statData = getStatData(character, stat);
+export function getPermanentStat(
+    character,
+    stat
+) {
+    const statData = getStatData(
+        character,
+        stat
+    );
 
     return (
         toNumber(statData.base) +
@@ -115,9 +129,15 @@ export function getPermanentStat(character, stat) {
 // TEMPORARY STATS
 // =========================================================
 
-export function getTemporaryStat(character, stat) {
+export function getTemporaryStat(
+    character,
+    stat
+) {
     return toNumber(
-        getStatData(character, stat).temporary
+        getStatData(
+            character,
+            stat
+        ).temporary
     );
 }
 
@@ -129,7 +149,8 @@ export function getEquippedWeaponStatBonus(
     character,
     stat
 ) {
-    const weapon = getEquippedWeapon(character);
+    const weapon =
+        getEquippedWeapon(character);
 
     if (!weapon) {
         return 0;
@@ -143,14 +164,138 @@ export function getEquippedWeaponStatBonus(
 }
 
 // =========================================================
-// FINAL STATS
+// STATUS STAT BONUSES / PENALTIES
+// =========================================================
+//
+// Example:
+//
+// Injured:
+// Attack      -3
+// Speed       -3
+// Defense     -3
+// Resistance  -3
+//
+// Overrides such as Shocked Avoid = 0 are handled
+// separately.
 // =========================================================
 
-export function getFinalStat(character, stat) {
+export function getStatusModifier(
+    character,
+    stat
+) {
+    return getStatusStatModifier(
+        character,
+        stat
+    );
+}
+
+// =========================================================
+// TERRAIN STAT BONUSES
+// =========================================================
+//
+// This handles bonuses to BASE combat stats.
+//
+// Example:
+//
+// Forest:
+// Defense +1
+//
+// Mountain:
+// Defense +3
+//
+// Avoid is derived and is therefore handled separately in
+// getAvoid().
+// =========================================================
+
+export function getTerrainBonus(
+    character,
+    stat
+) {
+    return getTerrainStatBonus(
+        character,
+        stat
+    );
+}
+
+// =========================================================
+// SUPPORT BONUSES
+// =========================================================
+//
+// The active support relationship may provide bonuses to:
+//
+// Attack
+// Speed
+// Defense
+// Resistance
+// Hit
+// Avoid
+//
+// Hit and Avoid are derived stats, so their bonuses are
+// applied later in getHit() and getAvoid().
+//
+// This helper is used here for bonuses to normal combat
+// stats.
+// =========================================================
+
+export function getActiveSupportBonus(
+    character,
+    stat
+) {
+    return getSupportBonus(
+        character,
+        stat
+    );
+}
+
+// =========================================================
+// FINAL COMBAT STATS
+// =========================================================
+//
+// Final =
+//
+// Permanent
+// + Temporary
+// + Weapon
+// + Status modifier
+// + Terrain
+// + Support
+//
+// This function is for the seven base combat stats:
+//
+// HP
+// Attack
+// Defense
+// Dexterity
+// Speed
+// Resistance
+// Luck
+//
+// Derived stats such as Hit and Avoid are calculated later.
+// =========================================================
+
+export function getFinalStat(
+    character,
+    stat
+) {
     return (
         getPermanentStat(character, stat) +
         getTemporaryStat(character, stat) +
-        getEquippedWeaponStatBonus(character, stat)
+        getEquippedWeaponStatBonus(
+            character,
+            stat
+        ) +
+        getStatusModifier(
+            character,
+            stat
+        ) +
+        getTerrainBonus(
+            character,
+            stat
+        ) +
+        getActiveSupportBonus(
+            character,
+            stat
+        )
     );
 }
 
@@ -159,7 +304,10 @@ export function getFinalStat(character, stat) {
 // =========================================================
 
 export function getMaxHp(character) {
-    return getFinalStat(character, 'hp');
+    return getFinalStat(
+        character,
+        'hp'
+    );
 }
 
 // =========================================================
@@ -167,29 +315,52 @@ export function getMaxHp(character) {
 // =========================================================
 //
 // Base:
+//
 // floor(Dexterity / 4)
 //
 // Precise:
-// +ceil(Gauge / 2) while transformed
+//
+// +ceil(Gauge / 2)
+//
+// Support:
+//
+// A support may directly grant Hit.
+//
+// Support Hit is applied AFTER calculating Hit from
+// Dexterity. It does not modify Dexterity itself.
 // =========================================================
 
 export function getHit(character) {
-    const dexterity = getFinalStat(
-        character,
-        'dexterity'
-    );
+    const dexterity =
+        getFinalStat(
+            character,
+            'dexterity'
+        );
 
-    let hit = Math.floor(dexterity / 4);
+    let hit =
+        Math.floor(
+            dexterity / 4
+        );
 
-    const weapon = getEquippedWeapon(character);
+    const weapon =
+        getEquippedWeapon(character);
 
     if (weapon) {
-        hit += getWeaponDerivedStatBonus(
-            weapon,
-            'hit',
-            getTransformationGauge(character)
-        );
+        hit +=
+            getWeaponDerivedStatBonus(
+                weapon,
+                'hit',
+                getTransformationGauge(
+                    character
+                )
+            );
     }
+
+    hit +=
+        getActiveSupportBonus(
+            character,
+            'hit'
+        );
 
     return hit;
 }
@@ -198,30 +369,72 @@ export function getHit(character) {
 // AVOID
 // =========================================================
 //
-// Base:
+// Normal:
+//
 // floor(Luck / 4) + 4
 //
-// Luckier:
-// +ceil(Gauge / 2) while transformed
+// Then:
+//
+// + weapon bonuses
+// + terrain bonuses
+// + support bonuses
+//
+// Shocked:
+//
+// Avoid is SET to 0.
+//
+// The override happens first here because once Shocked is
+// active the final value is fixed at 0. Forest, Water,
+// Luckier, Support bonuses, etc. cannot raise it.
 // =========================================================
 
 export function getAvoid(character) {
-    const luck = getFinalStat(
-        character,
-        'luck'
-    );
+    const override =
+        getStatusStatOverride(
+            character,
+            'avoid'
+        );
 
-    let avoid = Math.floor(luck / 4) + 4;
+    if (override !== null) {
+        return override;
+    }
 
-    const weapon = getEquippedWeapon(character);
+    const luck =
+        getFinalStat(
+            character,
+            'luck'
+        );
+
+    let avoid =
+        Math.floor(
+            luck / 4
+        ) + 4;
+
+    const weapon =
+        getEquippedWeapon(character);
 
     if (weapon) {
-        avoid += getWeaponDerivedStatBonus(
-            weapon,
-            'avoid',
-            getTransformationGauge(character)
-        );
+        avoid +=
+            getWeaponDerivedStatBonus(
+                weapon,
+                'avoid',
+                getTransformationGauge(
+                    character
+                )
+            );
     }
+
+    avoid +=
+        getTerrainStatBonus(
+            character,
+            'avoid'
+        );
+
+    avoid +=
+        getActiveSupportBonus(
+            character,
+            'avoid'
+        );
 
     return avoid;
 }
@@ -229,17 +442,46 @@ export function getAvoid(character) {
 // =========================================================
 // CRITICAL AVOID
 // =========================================================
+//
+// Normal:
+//
+// Avoid + 15
+//
+// Shocked:
+//
+// Critical Avoid is SET to 15.
+// =========================================================
 
-export function getCriticalAvoid(character) {
+export function getCriticalAvoid(
+    character
+) {
+    const override =
+        getStatusStatOverride(
+            character,
+            'criticalAvoid'
+        );
+
+    if (override !== null) {
+        return override;
+    }
+
     return getAvoid(character) + 15;
 }
 
 // =========================================================
 // MIGHT
 // =========================================================
+//
+// This is the character's NORMAL equipped weapon Might.
+//
+// Effectiveness is applied when calculating Power so that
+// the normal Might display can remain the weapon's actual
+// Might.
+// =========================================================
 
 export function getMight(character) {
-    const weapon = getEquippedWeapon(character);
+    const weapon =
+        getEquippedWeapon(character);
 
     if (!weapon) {
         return 0;
@@ -256,17 +498,21 @@ export function getMight(character) {
 // =========================================================
 //
 // Normal:
+//
 // Attack + Might
 //
 // Exact:
+//
 // Dexterity + Might
 //
 // Effective:
-// Might is tripled before Attack/Dexterity is added.
+//
+// Weapon Might is tripled BEFORE Attack/Dexterity is added.
 // =========================================================
 
 export function getPower(character) {
-    const weapon = getEquippedWeapon(character);
+    const weapon =
+        getEquippedWeapon(character);
 
     if (!weapon) {
         return 0;
@@ -275,21 +521,26 @@ export function getPower(character) {
     return getWeaponPower({
         weapon,
 
-        attack: getFinalStat(
-            character,
-            'attack'
-        ),
+        attack:
+            getFinalStat(
+                character,
+                'attack'
+            ),
 
-        dexterity: getFinalStat(
-            character,
-            'dexterity'
-        ),
+        dexterity:
+            getFinalStat(
+                character,
+                'dexterity'
+            ),
 
         transformationGauge:
-            getTransformationGauge(character),
+            getTransformationGauge(
+                character
+            ),
 
         effective:
-            character?.situational?.effective === true,
+            character?.situational?.effective ===
+            true,
     });
 }
 
@@ -307,29 +558,54 @@ export function getTri(character) {
 // MOVEMENT
 // =========================================================
 //
-// Base Movement comes from Movement Type.
+// Base movement comes from Movement Type.
 //
 // Nimbler:
-// +ceil(Gauge / 2) while transformed.
+//
+// +ceil(Gauge / 2)
+//
+// Shocked:
+//
+// Movement is SET to 0.
+//
+// Terrain movement costs are NOT subtracted here.
+// Terrain determines the cost of entering a tile rather
+// than changing the character's actual Movement stat.
 // =========================================================
 
 export function getMovement(character) {
-    const movementType = getMovementTypeData(
-        character?.movementType
-    );
+    const override =
+        getStatusStatOverride(
+            character,
+            'movement'
+        );
 
-    let movement = toNumber(
-        movementType?.move
-    );
+    if (override !== null) {
+        return override;
+    }
 
-    const weapon = getEquippedWeapon(character);
+    const movementType =
+        getMovementTypeData(
+            character?.movementType
+        );
+
+    let movement =
+        toNumber(
+            movementType?.move
+        );
+
+    const weapon =
+        getEquippedWeapon(character);
 
     if (weapon) {
-        movement += getWeaponDerivedStatBonus(
-            weapon,
-            'movement',
-            getTransformationGauge(character)
-        );
+        movement +=
+            getWeaponDerivedStatBonus(
+                weapon,
+                'movement',
+                getTransformationGauge(
+                    character
+                )
+            );
     }
 
     return movement;
@@ -343,7 +619,10 @@ export function getBaseSize(character) {
     return Math.max(
         1,
         Math.floor(
-            toNumber(character?.size, 1)
+            toNumber(
+                character?.size,
+                1
+            )
         )
     );
 }
@@ -353,24 +632,34 @@ export function getBaseSize(character) {
 // =========================================================
 //
 // Strike / Talon / Breath:
+//
 // +2 Size while transformed.
 //
-// Gauge 0 = not transformed.
-// Gauge 1-4 = transformed.
+// Gauge 0:
+// Not transformed.
+//
+// Gauge 1-4:
+// Transformed.
 // =========================================================
 
 export function getTotalSize(character) {
-    let totalSize = getBaseSize(character);
+    let totalSize =
+        getBaseSize(character);
 
     const baseWeapon =
-        getEquippedBaseWeapon(character);
+        getEquippedBaseWeapon(
+            character
+        );
 
     const gauge =
-        getTransformationGauge(character);
+        getTransformationGauge(
+            character
+        );
 
     if (
         gauge > 0 &&
-        baseWeapon?.transformation?.enabled === true
+        baseWeapon?.transformation?.enabled ===
+        true
     ) {
         totalSize += 2;
     }
@@ -384,14 +673,18 @@ export function getTotalSize(character) {
 //
 // Con = Total Size
 //
-// Armor Movement Type:
+// Armor:
 // +2 Con
 // =========================================================
 
 export function getCon(character) {
-    let con = getTotalSize(character);
+    let con =
+        getTotalSize(character);
 
-    if (character?.movementType === 'armor') {
+    if (
+        character?.movementType ===
+        'armor'
+    ) {
         con += 2;
     }
 
@@ -406,17 +699,22 @@ export function getCon(character) {
 // =========================================================
 
 export function getAid(character) {
-    const strength = toNumber(
-        character?.outOfCombatStats?.strength
-    );
+    const strength =
+        toNumber(
+            character
+                ?.outOfCombatStats
+                ?.strength
+        );
 
-    const movementType = getMovementTypeData(
-        character?.movementType
-    );
+    const movementType =
+        getMovementTypeData(
+            character?.movementType
+        );
 
-    const baseAid = toNumber(
-        movementType?.baseAid
-    );
+    const baseAid =
+        toNumber(
+            movementType?.baseAid
+        );
 
     return strength + baseAid;
 }
@@ -426,19 +724,28 @@ export function getAid(character) {
 // =========================================================
 //
 // Fate:
+//
 // min(floor(Luck / 5), 3)
 //
 // Finesse:
+//
 // min(floor(Dexterity / 5), 3)
 //
 // Acrobatics:
+//
 // min(floor(Speed / 5), 3)
+//
+// These use the character's currently displayed combat
+// stats, including active bonuses and penalties.
 // =========================================================
 
 export function getFate(character) {
     return Math.min(
         Math.floor(
-            getFinalStat(character, 'luck') / 5
+            getFinalStat(
+                character,
+                'luck'
+            ) / 5
         ),
         3
     );
@@ -447,7 +754,10 @@ export function getFate(character) {
 export function getFinesse(character) {
     return Math.min(
         Math.floor(
-            getFinalStat(character, 'dexterity') / 5
+            getFinalStat(
+                character,
+                'dexterity'
+            ) / 5
         ),
         3
     );
@@ -456,7 +766,10 @@ export function getFinesse(character) {
 export function getAcrobatics(character) {
     return Math.min(
         Math.floor(
-            getFinalStat(character, 'speed') / 5
+            getFinalStat(
+                character,
+                'speed'
+            ) / 5
         ),
         3
     );
@@ -470,12 +783,19 @@ export function getNormalStatCap(
     level,
     stat
 ) {
-    const currentLevel = Math.max(
-        1,
-        Math.floor(toNumber(level, 1))
-    );
+    const currentLevel =
+        Math.max(
+            1,
+            Math.floor(
+                toNumber(
+                    level,
+                    1
+                )
+            )
+        );
 
-    const isHp = stat === 'hp';
+    const isHp =
+        stat === 'hp';
 
     if (currentLevel === 1) {
         return isHp ? 20 : 8;
@@ -504,12 +824,19 @@ export function getNormalStatCap(
 // STAT CAP VALIDATION
 // =========================================================
 //
-// Caps apply to permanent stats:
+// ONLY:
 //
 // Base + Level Up
 //
-// Temporary bonuses and equipped weapon bonuses do NOT
-// count against permanent stat caps.
+// counts against the normal stat cap.
+//
+// These do NOT count:
+//
+// Temporary
+// Weapon
+// Status
+// Terrain
+// Support
 // =========================================================
 
 export function isStatWithinNormalCap(
@@ -517,12 +844,16 @@ export function isStatWithinNormalCap(
     stat
 ) {
     const permanentStat =
-        getPermanentStat(character, stat);
+        getPermanentStat(
+            character,
+            stat
+        );
 
-    const cap = getNormalStatCap(
-        character?.level,
-        stat
-    );
+    const cap =
+        getNormalStatCap(
+            character?.level,
+            stat
+        );
 
     return permanentStat <= cap;
 }
@@ -531,29 +862,46 @@ export function isStatWithinNormalCap(
 // LEVEL-UP POINTS
 // =========================================================
 //
-// Level 1:
-// 12 starting allocation points.
-//
 // Every level after Level 1:
-// +3 stat points.
 //
-// This function reports only points earned from leveling.
+// +3 stat points
 // =========================================================
 
-export function getLevelUpStatPoints(level) {
-    const currentLevel = Math.max(
-        1,
-        Math.floor(toNumber(level, 1))
-    );
+export function getLevelUpStatPoints(
+    level
+) {
+    const currentLevel =
+        Math.max(
+            1,
+            Math.floor(
+                toNumber(
+                    level,
+                    1
+                )
+            )
+        );
 
-    return (currentLevel - 1) * 3;
+    return (
+        currentLevel - 1
+    ) * 3;
 }
 
 // =========================================================
 // STARTING STAT POINTS
 // =========================================================
+//
+// Level 1:
+//
+// HP starts at 15.
+//
+// All other combat stats start at 3.
+//
+// Character receives 12 additional points.
+// =========================================================
 
-export function getStartingStatPointsSpent(character) {
+export function getStartingStatPointsSpent(
+    character
+) {
     const startingMinimums = {
         hp: 15,
         attack: 3,
@@ -564,14 +912,29 @@ export function getStartingStatPointsSpent(character) {
         luck: 3,
     };
 
-    return Object.entries(startingMinimums).reduce(
-        (total, [stat, minimum]) => {
-            const base = toNumber(
-                character?.combatStats?.[stat]?.base,
-                minimum
-            );
+    return Object.entries(
+        startingMinimums
+    ).reduce(
+        (
+            total,
+            [stat, minimum]
+        ) => {
+            const base =
+                toNumber(
+                    character
+                        ?.combatStats
+                        ?.[stat]
+                        ?.base,
+                    minimum
+                );
 
-            return total + Math.max(0, base - minimum);
+            return (
+                total +
+                Math.max(
+                    0,
+                    base - minimum
+                )
+            );
         },
         0
     );
@@ -582,7 +945,9 @@ export function getStartingStatPointsRemaining(
 ) {
     return (
         12 -
-        getStartingStatPointsSpent(character)
+        getStartingStatPointsSpent(
+            character
+        )
     );
 }
 
@@ -590,7 +955,9 @@ export function getStartingStatPointsRemaining(
 // LEVEL-UP POINTS SPENT
 // =========================================================
 
-export function getLevelUpStatPointsSpent(character) {
+export function getLevelUpStatPointsSpent(
+    character
+) {
     const stats = [
         'hp',
         'attack',
@@ -607,7 +974,10 @@ export function getLevelUpStatPointsSpent(character) {
             Math.max(
                 0,
                 toNumber(
-                    character?.combatStats?.[stat]?.levelUp
+                    character
+                        ?.combatStats
+                        ?.[stat]
+                        ?.levelUp
                 )
             ),
         0
@@ -618,8 +988,12 @@ export function getLevelUpStatPointsRemaining(
     character
 ) {
     return (
-        getLevelUpStatPoints(character?.level) -
-        getLevelUpStatPointsSpent(character)
+        getLevelUpStatPoints(
+            character?.level
+        ) -
+        getLevelUpStatPointsSpent(
+            character
+        )
     );
 }
 
@@ -627,7 +1001,9 @@ export function getLevelUpStatPointsRemaining(
 // OUT-OF-COMBAT POINTS
 // =========================================================
 
-export function getOutOfCombatPointsSpent(character) {
+export function getOutOfCombatPointsSpent(
+    character
+) {
     const stats = [
         'strength',
         'intellect',
@@ -641,7 +1017,9 @@ export function getOutOfCombatPointsSpent(character) {
             Math.max(
                 0,
                 toNumber(
-                    character?.outOfCombatStats?.[stat]
+                    character
+                        ?.outOfCombatStats
+                    ?.[stat]
                 )
             ),
         0
@@ -653,7 +1031,9 @@ export function getOutOfCombatPointsRemaining(
 ) {
     return (
         6 -
-        getOutOfCombatPointsSpent(character)
+        getOutOfCombatPointsSpent(
+            character
+        )
     );
 }
 
@@ -665,29 +1045,58 @@ export function isOutOfCombatStatValid(
     character,
     stat
 ) {
-    const value = toNumber(
-        character?.outOfCombatStats?.[stat]
-    );
+    const value =
+        toNumber(
+            character
+                ?.outOfCombatStats
+            ?.[stat]
+        );
 
-    return value >= 0 && value <= 3;
+    return (
+        value >= 0 &&
+        value <= 3
+    );
 }
 
 // =========================================================
 // TRANSFORMATION STATE
 // =========================================================
 
-export function isTransformed(character) {
+export function isTransformed(
+    character
+) {
     const weapon =
-        getEquippedBaseWeapon(character);
+        getEquippedBaseWeapon(
+            character
+        );
 
     return (
-        getTransformationGauge(character) > 0 &&
-        weapon?.transformation?.enabled === true
+        getTransformationGauge(
+            character
+        ) > 0 &&
+        weapon?.transformation?.enabled ===
+        true
     );
 }
 
 // =========================================================
-// DISPLAYED STAT SUMMARY
+// COMBAT STAT SUMMARY
+// =========================================================
+//
+// Useful for displaying:
+//
+// Base
+// Level Up
+// Temporary
+// Weapon
+// Status
+// Terrain
+// Support
+// Final
+//
+// The normal stat cap still only checks:
+//
+// Base + Level Up
 // =========================================================
 
 export function getCombatStatSummary(
@@ -695,73 +1104,122 @@ export function getCombatStatSummary(
     stat
 ) {
     return {
-        base: toNumber(
-            character?.combatStats?.[stat]?.base
-        ),
+        base:
+            toNumber(
+                character
+                    ?.combatStats
+                    ?.[stat]
+                    ?.base
+            ),
 
-        levelUp: toNumber(
-            character?.combatStats?.[stat]?.levelUp
-        ),
+        levelUp:
+            toNumber(
+                character
+                    ?.combatStats
+                    ?.[stat]
+                    ?.levelUp
+            ),
 
-        temporary: toNumber(
-            character?.combatStats?.[stat]?.temporary
-        ),
+        temporary:
+            getTemporaryStat(
+                character,
+                stat
+            ),
 
-        weapon: getEquippedWeaponStatBonus(
-            character,
-            stat
-        ),
+        weapon:
+            getEquippedWeaponStatBonus(
+                character,
+                stat
+            ),
 
-        permanent: getPermanentStat(
-            character,
-            stat
-        ),
+        status:
+            getStatusModifier(
+                character,
+                stat
+            ),
 
-        final: getFinalStat(
-            character,
-            stat
-        ),
+        terrain:
+            getTerrainBonus(
+                character,
+                stat
+            ),
 
-        cap: getNormalStatCap(
-            character?.level,
-            stat
-        ),
+        support:
+            getActiveSupportBonus(
+                character,
+                stat
+            ),
 
-        withinCap: isStatWithinNormalCap(
-            character,
-            stat
-        ),
+        permanent:
+            getPermanentStat(
+                character,
+                stat
+            ),
+
+        final:
+            getFinalStat(
+                character,
+                stat
+            ),
+
+        cap:
+            getNormalStatCap(
+                character?.level,
+                stat
+            ),
+
+        withinCap:
+            isStatWithinNormalCap(
+                character,
+                stat
+            ),
     };
 }
 
 // =========================================================
 // DERIVED COMBAT SUMMARY
 // =========================================================
+//
+// This gives the eventual character-sheet UI one convenient
+// object containing all of the commonly displayed derived
+// values.
+// =========================================================
 
-export function getDerivedCombatStats(character) {
+export function getDerivedCombatStats(
+    character
+) {
     return {
-        maxHp: getMaxHp(character),
+        maxHp:
+            getMaxHp(character),
 
         currentHp:
             character?.currentHp ??
             getMaxHp(character),
 
-        charge: toNumber(
-            character?.charge
-        ),
+        charge:
+            toNumber(
+                character?.charge
+            ),
 
-        might: getMight(character),
+        might:
+            getMight(character),
 
-        power: getPower(character),
+        power:
+            getPower(character),
 
-        tri: getTri(character),
+        tri:
+            getTri(character),
 
-        hit: getHit(character),
+        hit:
+            getHit(character),
 
-        avoid: getAvoid(character),
+        avoid:
+            getAvoid(character),
 
         criticalAvoid:
-            getCriticalAvoid(character),
+            getCriticalAvoid(
+                character
+            ),
 
         movement:
             getMovement(character),
@@ -770,7 +1228,9 @@ export function getDerivedCombatStats(character) {
             getBaseSize(character),
 
         totalSize:
-            getTotalSize(character),
+            getTotalSize(
+                character
+            ),
 
         con:
             getCon(character),
@@ -785,12 +1245,18 @@ export function getDerivedCombatStats(character) {
             getFinesse(character),
 
         acrobatics:
-            getAcrobatics(character),
+            getAcrobatics(
+                character
+            ),
 
         transformed:
-            isTransformed(character),
+            isTransformed(
+                character
+            ),
 
         transformationGauge:
-            getTransformationGauge(character),
+            getTransformationGauge(
+                character
+            ),
     };
 }

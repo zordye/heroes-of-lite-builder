@@ -244,24 +244,15 @@ export default function createCharacter() {
     // STATUS
     // =====================================================
 
-    /*
-      Current Status is selected manually.
- 
-      We can replace this with a specific default Status ID
-      once the Status data file is finalized.
-    */
-    status: null,
+    // Multiple different Status Effects may be active simultaneously.
+    statuses: [],
 
     // =====================================================
     // TERRAIN
     // =====================================================
 
-    /*
-      Terrain is selected manually.
- 
-      Additional terrain definitions can be added later
-      without changing the character model.
-    */
+    // ID from terrain.js.
+    // null means no terrain is currently selected.
     terrain: null,
 
     // =====================================================
