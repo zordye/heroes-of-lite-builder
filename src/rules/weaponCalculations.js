@@ -438,11 +438,20 @@ export function getWeaponInnateAttributeIds(weapon) {
 }
 
 export function getWeaponInnateAttributes(weapon) {
-    return getWeaponInnateAttributeIds(weapon)
-        .map((attributeId) =>
-            getWeaponRefinementById(attributeId)
-        )
-        .filter(Boolean);
+    const descriptions = {
+        heal: 'Restores an adjacent ally’s HP using Staff Power.',
+        brave: 'Deals two consecutive strikes per attack when initiating.',
+        wingclipping: 'Effective against units with the Winged trait.',
+        poison: 'Has the innate Poison attribute.',
+    };
+    return getWeaponInnateAttributeIds(weapon).map((id) =>
+        getWeaponRefinementById(id) ?? {
+            id,
+            name: id.charAt(0).toUpperCase() + id.slice(1),
+            description: descriptions[id] ?? 'Innate weapon attribute.',
+            innate: true,
+        }
+    );
 }
 
 // =========================================================

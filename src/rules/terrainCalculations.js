@@ -1,12 +1,12 @@
 import { getTerrainById } from '../data/terrain';
-import { getMovementTypeById } from '../data/movementTypes';
+import { movementTypes } from '../data/movementTypes';
 
 export function getCharacterTerrain(character) {
     return getTerrainById(character?.terrain) ?? null;
 }
 
 export function ignoresTerrainStatEffects(character) {
-    const movementType = getMovementTypeById(character?.movementType);
+    const movementType = movementTypes.find((type) => type.id === character?.movementType);
 
     return movementType?.id === 'flier';
 }

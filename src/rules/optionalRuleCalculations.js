@@ -25,8 +25,8 @@ function getConnectedStatTotal(character, pairId) {
     }
 
     return pair.stats.reduce((total, statId) => {
-        const base = character.stats?.base?.[statId] ?? 0;
-        const levelUp = character.stats?.levelUp?.[statId] ?? 0;
+        const base = character.combatStats?.[statId]?.base ?? 0;
+        const levelUp = character.combatStats?.[statId]?.levelUp ?? 0;
 
         return total + base + levelUp;
     }, 0);

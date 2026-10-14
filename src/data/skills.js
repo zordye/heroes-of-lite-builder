@@ -2491,3 +2491,4 @@ const skills = [
 ];
 
 export default skills;
+export { skills };

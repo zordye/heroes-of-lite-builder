@@ -5,7 +5,7 @@ import {
 
 import {
     getStatCap,
-} from './progressionCalculations';
+} from '../data/progressionCalculations';
 
 import {
     getConnectedStatPairStatus,
@@ -22,7 +22,7 @@ function getCombatStatPointsSpent(character) {
     return Object.entries(minimums).reduce(
         (total, [statId, minimum]) => {
             const current =
-                character.stats?.base?.[statId] ??
+                character.combatStats?.[statId]?.base ??
                 minimum;
 
             return total + Math.max(0, current - minimum);
@@ -47,7 +47,7 @@ function getCombatStatCreationStatus(
     statId
 ) {
     const value =
-        character.stats?.base?.[statId] ?? 0;
+        character.combatStats?.[statId]?.base ?? 0;
 
     const minimum =
         characterCreationRules.combatStatMinimums[
@@ -94,7 +94,7 @@ function getAllCombatStatCreationStatuses(
 // =========================================================
 
 function getNonCombatStatPointsSpent(character) {
-    const stats = character.nonCombatStats ?? {};
+    const stats = character.outOfCombatStats ?? {};
 
     return (
         (stats.strength ?? 0) +
@@ -118,7 +118,7 @@ function getNonCombatStatCreationStatus(
     statId
 ) {
     const value =
-        character.nonCombatStats?.[statId] ?? 0;
+        character.outOfCombatStats?.[statId] ?? 0;
 
     const minimum =
         characterCreationRules.nonCombatStatMinimum;

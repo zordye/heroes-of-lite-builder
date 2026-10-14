@@ -591,7 +591,7 @@ export function getMovement(character) {
 
     let movement =
         toNumber(
-            movementType?.move
+            movementType?.movement
         );
 
     const weapon =

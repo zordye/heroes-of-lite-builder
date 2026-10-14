@@ -83,3 +83,4 @@ const movementTypes = [
 ];
 
 export default movementTypes;
+export { movementTypes };

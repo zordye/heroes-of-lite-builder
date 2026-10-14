@@ -65,3 +65,4 @@ const supportTypes = [
 ];
 
 export default supportTypes;
+export { supportTypes };

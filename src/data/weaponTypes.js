@@ -66,3 +66,4 @@ const weaponTypes = [
 ];
 
 export default weaponTypes;
+export { weaponTypes };
