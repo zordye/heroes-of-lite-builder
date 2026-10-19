@@ -1,225 +1,71 @@
+
 import { skills } from '../data/skills';
 import { weaponTypes } from '../data/weaponTypes';
 import { movementTypes } from '../data/movementTypes';
 import { getBaseWeaponById } from '../data/baseWeapons';
 
-// =========================================================
-// INTERNAL HELPERS
-// =========================================================
+const number = (value, fallback = 0) => {
+    const result = Number(value);
+    return Number.isFinite(result) ? result : fallback;
+};
 
-function toNumber(value, fallback = 0) {
-    const number = Number(value);
+const findById = (collection, id) => {
+    if (!collection || !id) return null;
+    if (Array.isArray(collection)) {
+        return collection.find((entry) => entry.id === id) ?? null;
+    }
+    return collection[id] ?? null;
+};
 
-    return Number.isFinite(number)
-        ? number
-        : fallback;
+const getSkillById = (id) => findById(skills, id);
+
+export function getSelectedSkillIds(character, excludeSkillId = null) {
+    const ids = [
+        ...Object.values(character?.skillSlots ?? {}),
+        ...(character?.additionalSkills ?? []),
+        character?.personalSkill,
+    ];
+
+    return [...new Set(ids.filter(
+        (id) => typeof id === 'string' &&
+            id.length > 0 &&
+            id !== excludeSkillId
+    ))];
 }
 
-function normalizeString(value) {
-    if (typeof value !== 'string') {
-        return null;
-    }
-
-    return value.trim().toLowerCase();
-}
-
-function getSkillById(skillId) {
-    return (
-        skills.find(
-            (skill) => skill.id === skillId
-        ) ?? null
-    );
-}
-
-function getMovementTypeData(movementTypeId) {
-    if (!movementTypeId) {
-        return null;
-    }
-
-    if (Array.isArray(movementTypes)) {
-        return (
-            movementTypes.find(
-                (movementType) =>
-                    movementType.id === movementTypeId
-            ) ?? null
-        );
-    }
-
-    return movementTypes[movementTypeId] ?? null;
-}
-
-function getWeaponTypeData(weaponTypeId) {
-    if (!weaponTypeId) {
-        return null;
-    }
-
-    if (Array.isArray(weaponTypes)) {
-        return (
-            weaponTypes.find(
-                (weaponType) =>
-                    weaponType.id === weaponTypeId
-            ) ?? null
-        );
-    }
-
-    return weaponTypes[weaponTypeId] ?? null;
-}
-
-// =========================================================
-// SELECTED SKILL IDS
-// =========================================================
-
-export function getSelectedSkillIds(
-    character,
-    excludeSkillId = null
-) {
-    const ids = new Set();
-
-    if (character?.skillSlots) {
-        for (const skillId of Object.values(
-            character.skillSlots
-        )) {
-            if (
-                skillId &&
-                skillId !== excludeSkillId
-            ) {
-                ids.add(skillId);
-            }
-        }
-    }
-
-    if (Array.isArray(character?.additionalSkills)) {
-        for (const skillId of character.additionalSkills) {
-            if (
-                skillId &&
-                skillId !== excludeSkillId
-            ) {
-                ids.add(skillId);
-            }
-        }
-    }
-
-    if (
-        character?.personalSkill &&
-        character.personalSkill !== excludeSkillId
-    ) {
-        ids.add(character.personalSkill);
-    }
-
-    return [...ids];
-}
-
-export function getSelectedSkills(
-    character,
-    excludeSkillId = null
-) {
-    return getSelectedSkillIds(
-        character,
-        excludeSkillId
-    )
+export function getSelectedSkills(character, excludeSkillId = null) {
+    return getSelectedSkillIds(character, excludeSkillId)
         .map(getSkillById)
         .filter(Boolean);
 }
 
-export function hasSkill(
-    character,
-    skillId,
-    excludeSkillId = null
-) {
-    return getSelectedSkillIds(
-        character,
-        excludeSkillId
-    ).includes(skillId);
+export function hasSkill(character, skillId, excludeSkillId = null) {
+    return getSelectedSkillIds(character, excludeSkillId)
+        .includes(skillId);
 }
 
-// =========================================================
-// WEAPON PROFICIENCIES
-// =========================================================
-
-export function hasWeaponProficiency(
-    character,
-    weaponTypeId
-) {
-    if (
-        !Array.isArray(
-            character?.weaponProficiencies
-        )
-    ) {
-        return false;
-    }
-
-    return character.weaponProficiencies.includes(
-        weaponTypeId
-    );
+export function hasWeaponProficiency(character, weaponTypeId) {
+    return (character?.weaponProficiencies ?? [])
+        .includes(weaponTypeId);
 }
 
-export function hasAnyWeaponProficiency(
-    character,
-    weaponTypeIds = []
-) {
-    return weaponTypeIds.some(
-        (weaponTypeId) =>
-            hasWeaponProficiency(
-                character,
-                weaponTypeId
-            )
-    );
+export function hasAnyWeaponProficiency(character, ids = []) {
+    return ids.some((id) => hasWeaponProficiency(character, id));
 }
 
-export function hasAllWeaponProficiencies(
-    character,
-    weaponTypeIds = []
-) {
-    return weaponTypeIds.every(
-        (weaponTypeId) =>
-            hasWeaponProficiency(
-                character,
-                weaponTypeId
-            )
-    );
+export function hasAllWeaponProficiencies(character, ids = []) {
+    return ids.every((id) => hasWeaponProficiency(character, id));
 }
 
-// =========================================================
-// MOVEMENT TYPE
-// =========================================================
-
-export function hasMovementType(
-    character,
-    movementTypeId
-) {
-    return (
-        character?.movementType ===
-        movementTypeId
-    );
+export function hasMovementType(character, movementTypeId) {
+    return character?.movementType === movementTypeId;
 }
 
-// =========================================================
-// SKILL EFFECTS
-// =========================================================
-//
-// These helpers inspect effects granted by skills the
-// character ALREADY possesses.
-//
-// The candidate skill can be excluded so that it cannot
-// satisfy its own prerequisite.
-// =========================================================
-
-export function getActiveSkillEffects(
-    character,
-    excludeSkillId = null
-) {
-    const selectedSkills =
-        getSelectedSkills(
-            character,
-            excludeSkillId
-        );
-
-    return selectedSkills.flatMap(
-        (skill) =>
-            Array.isArray(skill.effects)
-                ? skill.effects
-                : []
-    );
+export function getActiveSkillEffects(character, excludeSkillId = null) {
+    return getSelectedSkills(character, excludeSkillId)
+        .flatMap((skill) => Array.isArray(skill.effects)
+            ? skill.effects
+            : []);
 }
 
 export function hasSkillEffect(
@@ -227,28 +73,9 @@ export function hasSkillEffect(
     effectType,
     excludeSkillId = null
 ) {
-    return getActiveSkillEffects(
-        character,
-        excludeSkillId
-    ).some(
-        (effect) =>
-            effect?.type === effectType
-    );
+    return getActiveSkillEffects(character, excludeSkillId)
+        .some((effect) => effect?.type === effectType);
 }
-
-// =========================================================
-// SKILL-GRANTED WEAPON PROFICIENCIES
-// =========================================================
-//
-// Future/homebrew skills may grant weapon proficiency.
-//
-// Supported effect:
-//
-// {
-//   type: 'grant-weapon-proficiency',
-//   weaponType: 'sword',
-// }
-// =========================================================
 
 export function getSkillGrantedWeaponProficiencies(
     character,
@@ -261,11 +88,24 @@ export function getSkillGrantedWeaponProficiencies(
         excludeSkillId
     )) {
         if (
-            effect?.type ===
-            'grant-weapon-proficiency' &&
-            effect.weaponType
+            effect.type === 'grant-weapon-proficiency' ||
+            effect.type === 'weapon-proficiency'
         ) {
-            granted.add(effect.weaponType);
+            if (effect.weaponType) granted.add(effect.weaponType);
+            if (effect.weapon) granted.add(effect.weapon);
+
+            for (const id of effect.weaponTypes ?? []) {
+                granted.add(id);
+            }
+        }
+    }
+
+    for (const skill of getSelectedSkills(
+        character,
+        excludeSkillId
+    )) {
+        for (const id of skill.grantsWeaponProficiencies ?? []) {
+            granted.add(id);
         }
     }
 
@@ -277,165 +117,56 @@ export function hasEffectiveWeaponProficiency(
     weaponTypeId,
     excludeSkillId = null
 ) {
-    if (
-        hasWeaponProficiency(
+    return hasWeaponProficiency(character, weaponTypeId) ||
+        getSkillGrantedWeaponProficiencies(
             character,
-            weaponTypeId
-        )
-    ) {
-        return true;
-    }
-
-    return getSkillGrantedWeaponProficiencies(
-        character,
-        excludeSkillId
-    ).includes(weaponTypeId);
+            excludeSkillId
+        ).includes(weaponTypeId);
 }
-
-// =========================================================
-// SKILL-GRANTED MOVEMENT TYPE LEVEL OFFSET
-// =========================================================
-//
-// This supports skills such as Class Change skills that may
-// alter how the character qualifies for other skills.
-//
-// IMPORTANT:
-// The candidate skill is excluded during its own
-// eligibility check.
-//
-// Supported effect:
-//
-// {
-//   type: 'skill-level-offset',
-//   amount: 5,
-// }
-// =========================================================
 
 export function getSkillLevelOffset(
     character,
     excludeSkillId = null
 ) {
-    return getActiveSkillEffects(
-        character,
-        excludeSkillId
-    ).reduce(
-        (total, effect) => {
-            if (
-                effect?.type !==
-                'skill-level-offset'
-            ) {
-                return total;
-            }
-
-            return (
-                total +
-                toNumber(effect.amount)
-            );
-        },
-        0
-    );
+    return getActiveSkillEffects(character, excludeSkillId)
+        .reduce((total, effect) => {
+            return effect?.type === 'skill-level-offset'
+                ? total + number(effect.amount)
+                : total;
+        }, 0);
 }
 
-// =========================================================
-// MOVEMENT TYPE LEVEL OFFSET
-// =========================================================
-//
-// Armor has a +5 Skill Level Offset.
-//
-// This affects skill qualification only.
-// =========================================================
-
-export function getMovementSkillLevelOffset(
-    character
-) {
-    const movementType =
-        getMovementTypeData(
-            character?.movementType
-        );
-
-    return toNumber(
-        movementType?.skillLevelOffset
+export function getMovementSkillLevelOffset(character) {
+    const movement = findById(
+        movementTypes,
+        character?.movementType
     );
-}
 
-// =========================================================
-// EFFECTIVE SKILL LEVEL
-// =========================================================
+    return number(movement?.skillLevelOffset);
+}
 
 export function getEffectiveSkillLevel(
     character,
     excludeSkillId = null
 ) {
-    const level = Math.max(
-        1,
-        Math.floor(
-            toNumber(character?.level, 1)
-        )
-    );
-
-    return (
-        level +
+    return Math.max(1, Math.floor(number(character?.level, 1))) +
         getMovementSkillLevelOffset(character) +
-        getSkillLevelOffset(
-            character,
-            excludeSkillId
-        )
-    );
+        getSkillLevelOffset(character, excludeSkillId);
 }
-
-// =========================================================
-// TRAITS GRANTED BY EXISTING SKILLS
-// =========================================================
-//
-// Supported forms:
-//
-// trait: 'Furred'
-//
-// grantsTrait: 'Furred'
-//
-// grantsTraits: ['Furred']
-//
-// effects: [
-//   {
-//     type: 'grant-trait',
-//     trait: 'Furred',
-//   },
-// ]
-//
-// Again, candidate skill is excluded.
-// =========================================================
 
 function collectTraitsFromSkill(skill) {
     const traits = new Set();
 
-    if (!skill) {
-        return [];
+    if (skill?.trait) traits.add(skill.trait);
+    if (skill?.grantsTrait) traits.add(skill.grantsTrait);
+
+    for (const trait of skill?.grantsTraits ?? []) {
+        traits.add(trait);
     }
 
-    if (skill.trait) {
-        traits.add(skill.trait);
-    }
-
-    if (skill.grantsTrait) {
-        traits.add(skill.grantsTrait);
-    }
-
-    if (Array.isArray(skill.grantsTraits)) {
-        for (const trait of skill.grantsTraits) {
-            if (trait) {
-                traits.add(trait);
-            }
-        }
-    }
-
-    if (Array.isArray(skill.effects)) {
-        for (const effect of skill.effects) {
-            if (
-                effect?.type === 'grant-trait' &&
-                effect.trait
-            ) {
-                traits.add(effect.trait);
-            }
+    for (const effect of skill?.effects ?? []) {
+        if (effect?.type === 'grant-trait' && effect.trait) {
+            traits.add(effect.trait);
         }
     }
 
@@ -446,109 +177,56 @@ export function getSkillGrantedTraits(
     character,
     excludeSkillId = null
 ) {
-    const traits = new Set();
-
-    for (const skill of getSelectedSkills(
-        character,
-        excludeSkillId
-    )) {
-        for (const trait of collectTraitsFromSkill(
-            skill
-        )) {
-            traits.add(trait);
-        }
-    }
-
-    return [...traits];
+    return [...new Set(
+        getSelectedSkills(character, excludeSkillId)
+            .flatMap(collectTraitsFromSkill)
+    )];
 }
-
-// =========================================================
-// CHARACTER TRAITS FOR PREREQUISITES
-// =========================================================
-//
-// This calculates the trait sources needed for skill
-// prerequisites without importing traitCalculations.js.
-//
-// Avoiding that import keeps us from creating a circular
-// dependency between trait eligibility and skill
-// eligibility.
-// =========================================================
 
 export function getTraitsForSkillEligibility(
     character,
     excludeSkillId = null
 ) {
     const traits = new Set();
+    const movement = findById(
+        movementTypes,
+        character?.movementType
+    );
 
-    // -------------------------------------------------------
-    // Movement trait
-    // -------------------------------------------------------
+    if (movement?.trait) traits.add(movement.trait);
 
-    const movementType =
-        getMovementTypeData(
-            character?.movementType
+    for (const trait of movement?.traits ?? []) {
+        traits.add(trait);
+    }
+
+    const equipped = character?.weapons?.find(
+        (weapon) => weapon.id === character.equippedWeaponId
+    );
+
+    const baseWeapon = equipped
+        ? getBaseWeaponById(equipped.baseWeaponId)
+        : null;
+
+    if (baseWeapon) {
+        const weaponType = findById(
+            weaponTypes,
+            baseWeapon.weaponType
         );
 
-    if (movementType?.trait) {
-        traits.add(movementType.trait);
-    }
+        if (weaponType?.equippedTrait) {
+            traits.add(weaponType.equippedTrait);
+        }
 
-    // -------------------------------------------------------
-    // Equipped weapon / transformation traits
-    // -------------------------------------------------------
+        if (
+            number(character?.transformationGauge) > 0 &&
+            baseWeapon.transformation?.enabled
+        ) {
+            const trait = baseWeapon.transformation.trait ??
+                weaponType?.transformationTrait;
 
-    if (
-        character?.equippedWeaponId &&
-        Array.isArray(character?.weapons)
-    ) {
-        const equippedWeapon =
-            character.weapons.find(
-                (weapon) =>
-                    weapon.id ===
-                    character.equippedWeaponId
-            );
-
-        const baseWeapon =
-            getBaseWeaponById(
-                equippedWeapon?.baseWeaponId
-            );
-
-        if (baseWeapon) {
-            const weaponType =
-                getWeaponTypeData(
-                    baseWeapon.weaponType
-                );
-
-            // Curse → Fiendish
-            if (weaponType?.equippedTrait) {
-                traits.add(
-                    weaponType.equippedTrait
-                );
-            }
-
-            // Strike / Talon / Breath transformation trait
-            if (
-                toNumber(
-                    character?.transformationGauge
-                ) > 0 &&
-                baseWeapon?.transformation?.enabled
-            ) {
-                const transformationTrait =
-                    baseWeapon.transformation.trait ??
-                    weaponType?.transformationTrait;
-
-                if (transformationTrait) {
-                    traits.add(
-                        transformationTrait
-                    );
-                }
-            }
+            if (trait) traits.add(trait);
         }
     }
-
-    // -------------------------------------------------------
-    // Skill traits
-    // -------------------------------------------------------
 
     for (const trait of getSkillGrantedTraits(
         character,
@@ -560,381 +238,266 @@ export function getTraitsForSkillEligibility(
     return [...traits];
 }
 
-// =========================================================
-// OPTIONAL RULE REQUIREMENTS
-// =========================================================
-
-function meetsOptionalRuleRequirement(
-    character,
-    requirement
-) {
-    if (!requirement) {
-        return true;
-    }
-
-    const ruleId =
-        requirement.rule ??
+function meetsOptionalRuleRequirement(character, requirement) {
+    const ruleId = requirement.rule ??
         requirement.id ??
         requirement.optionalRule;
 
-    if (!ruleId) {
-        return true;
-    }
+    if (!ruleId) return false;
 
-    const expected =
-        requirement.enabled ?? true;
-
-    return (
-        character?.optionalRules?.[ruleId] ===
-        expected
-    );
+    return character?.optionalRules?.[ruleId] ===
+        (requirement.enabled ?? true);
 }
-
-// =========================================================
-// SINGLE REQUIREMENT CHECK
-// =========================================================
-//
-// This supports the prerequisite shapes we currently use
-// and leaves room for future/homebrew skill data.
-//
-// Unknown requirement types fail safely rather than
-// silently granting eligibility.
-// =========================================================
 
 export function meetsSkillRequirement(
     character,
     requirement,
     candidateSkillId = null
 ) {
-    if (!requirement) {
-        return true;
+    if (!requirement || typeof requirement !== 'object') {
+        return false;
     }
 
-    const type =
-        requirement.type ??
-        requirement.kind;
+    // The anyOf entries in skills.js are shorthand objects.
+    if (!requirement.type && !requirement.kind) {
+        if (requirement.skill) {
+            return hasSkill(
+                character,
+                requirement.skill,
+                candidateSkillId
+            );
+        }
 
-    switch (type) {
-        // -----------------------------------------------------
-        // Level
-        // -----------------------------------------------------
+        if (requirement.weaponProficiency) {
+            return hasEffectiveWeaponProficiency(
+                character,
+                requirement.weaponProficiency,
+                candidateSkillId
+            );
+        }
 
+        if (requirement.trait) {
+            return getTraitsForSkillEligibility(
+                character,
+                candidateSkillId
+            ).includes(requirement.trait);
+        }
+
+        if (requirement.movementType) {
+            return hasMovementType(character, requirement.movementType);
+        }
+
+        return false;
+    }
+
+    switch (requirement.type ?? requirement.kind) {
         case 'level':
-            return (
-                getEffectiveSkillLevel(
-                    character,
-                    candidateSkillId
-                ) >=
-                toNumber(requirement.level)
-            );
-
         case 'minimum-level':
-            return (
-                getEffectiveSkillLevel(
-                    character,
-                    candidateSkillId
-                ) >=
-                toNumber(
-                    requirement.level ??
-                    requirement.value
-                )
-            );
-
-        // -----------------------------------------------------
-        // Weapon proficiency
-        // -----------------------------------------------------
+            return getEffectiveSkillLevel(
+                character,
+                candidateSkillId
+            ) >= number(requirement.level ?? requirement.value);
 
         case 'weapon-proficiency':
             return hasEffectiveWeaponProficiency(
                 character,
-                requirement.weaponType ??
-                requirement.weapon,
+                requirement.weaponType ?? requirement.weapon,
                 candidateSkillId
             );
 
         case 'any-weapon-proficiency':
-            return (
-                requirement.weaponTypes ??
-                requirement.weapons ??
-                []
-            ).some((weaponTypeId) =>
-                hasEffectiveWeaponProficiency(
+            return (requirement.weaponTypes ?? requirement.weapons ?? [])
+                .some((id) => hasEffectiveWeaponProficiency(
                     character,
-                    weaponTypeId,
+                    id,
                     candidateSkillId
-                )
-            );
+                ));
 
         case 'all-weapon-proficiencies':
-            return (
-                requirement.weaponTypes ??
-                requirement.weapons ??
-                []
-            ).every((weaponTypeId) =>
-                hasEffectiveWeaponProficiency(
+            return (requirement.weaponTypes ?? requirement.weapons ?? [])
+                .every((id) => hasEffectiveWeaponProficiency(
                     character,
-                    weaponTypeId,
+                    id,
                     candidateSkillId
-                )
-            );
-
-        // -----------------------------------------------------
-        // Movement type
-        // -----------------------------------------------------
+                ));
 
         case 'movement-type':
             return hasMovementType(
                 character,
-                requirement.movementType ??
-                requirement.value
+                requirement.movementType ?? requirement.value
             );
 
         case 'any-movement-type':
-            return (
-                requirement.movementTypes ??
-                requirement.values ??
-                []
-            ).includes(character?.movementType);
-
-        // -----------------------------------------------------
-        // Existing skill
-        // -----------------------------------------------------
+            return (requirement.movementTypes ?? requirement.values ?? [])
+                .includes(character?.movementType);
 
         case 'skill':
             return hasSkill(
                 character,
-                requirement.skillId ??
-                requirement.skill,
+                requirement.skillId ?? requirement.skill,
                 candidateSkillId
             );
 
         case 'any-skill':
-            return (
-                requirement.skillIds ??
-                requirement.skills ??
-                []
-            ).some((skillId) =>
-                hasSkill(
+            return (requirement.skillIds ?? requirement.skills ?? [])
+                .some((id) => hasSkill(
                     character,
-                    skillId,
+                    id,
                     candidateSkillId
-                )
-            );
+                ));
 
-        // -----------------------------------------------------
-        // Trait
-        // -----------------------------------------------------
-
-        case 'trait': {
-            const requiredTrait =
-                requirement.trait ??
-                requirement.value;
-
+        case 'trait':
             return getTraitsForSkillEligibility(
                 character,
                 candidateSkillId
-            ).includes(requiredTrait);
-        }
+            ).includes(requirement.trait ?? requirement.value);
 
-        case 'any-trait': {
-            const traits =
-                requirement.traits ??
-                requirement.values ??
-                [];
-
-            const activeTraits =
-                getTraitsForSkillEligibility(
+        case 'any-trait':
+            return (requirement.traits ?? requirement.values ?? [])
+                .some((trait) => getTraitsForSkillEligibility(
                     character,
                     candidateSkillId
-                );
-
-            return traits.some((trait) =>
-                activeTraits.includes(trait)
-            );
-        }
-
-        // -----------------------------------------------------
-        // Optional rule
-        // -----------------------------------------------------
+                ).includes(trait));
 
         case 'optional-rule':
-            return meetsOptionalRuleRequirement(
-                character,
-                requirement
-            );
+            return meetsOptionalRuleRequirement(character, requirement);
 
         default:
             return false;
     }
 }
 
-// =========================================================
-// REQUIREMENT GROUP
-// =========================================================
-//
-// Default:
-// ALL requirements must be met.
-//
-// If the skill explicitly uses:
-//
-// requirementMode: 'any'
-//
-// then only one requirement must be met.
-// =========================================================
+function meetsObjectRequirements(character, requirements, skillId) {
+    const supported = new Set([
+        'level',
+        'movementTypes',
+        'anyWeaponProficiency',
+        'requiredSkills',
+        'excludedSkills',
+        'requiresCombatArt',
+        'requiresGMPermission',
+        'anyOf',
+    ]);
 
-export function meetsSkillRequirements(
-    character,
-    skill
-) {
-    const requirements =
-        skill?.requirements ??
+    if (Object.keys(requirements).some((key) => !supported.has(key))) {
+        return false;
+    }
+
+    if (
+        requirements.level != null &&
+        getEffectiveSkillLevel(character, skillId) <
+        number(requirements.level)
+    ) {
+        return false;
+    }
+
+    if (
+        requirements.movementTypes &&
+        !requirements.movementTypes.includes(character?.movementType)
+    ) {
+        return false;
+    }
+
+    if (
+        requirements.anyWeaponProficiency &&
+        !requirements.anyWeaponProficiency.some((id) =>
+            hasEffectiveWeaponProficiency(character, id, skillId)
+        )
+    ) {
+        return false;
+    }
+
+    if (
+        requirements.requiredSkills &&
+        !requirements.requiredSkills.every((id) =>
+            hasSkill(character, id, skillId)
+        )
+    ) {
+        return false;
+    }
+
+    if (
+        requirements.excludedSkills?.some((id) =>
+            hasSkill(character, id, skillId)
+        )
+    ) {
+        return false;
+    }
+
+    if (
+        requirements.requiresCombatArt === true &&
+        !getSelectedSkills(character, skillId)
+            .some((skill) => skill.category === 'combat-art')
+    ) {
+        return false;
+    }
+
+    if (
+        requirements.anyOf &&
+        !requirements.anyOf.some((requirement) =>
+            meetsSkillRequirement(character, requirement, skillId)
+        )
+    ) {
+        return false;
+    }
+
+    // GM approval is not enforced by the character builder.
+    return true;
+}
+
+export function meetsSkillRequirements(character, skill) {
+    const requirements = skill?.requirements ??
         skill?.prerequisites ??
         [];
 
-    if (!Array.isArray(requirements)) {
-        return true;
-    }
-
-    if (requirements.length === 0) {
-        return true;
-    }
-
-    const mode =
-        skill.requirementMode ??
-        skill.prerequisiteMode ??
-        'all';
-
-    if (mode === 'any') {
-        return requirements.some(
-            (requirement) =>
-                meetsSkillRequirement(
-                    character,
-                    requirement,
-                    skill.id
-                )
-        );
-    }
-
-    return requirements.every(
-        (requirement) =>
-            meetsSkillRequirement(
-                character,
-                requirement,
-                skill.id
-            )
-    );
-}
-
-// =========================================================
-// MUTUAL EXCLUSIONS
-// =========================================================
-
-export function getMutuallyExclusiveSkillIds(
-    skill
-) {
-    const ids = new Set();
-
-    const sources = [
-        skill?.mutuallyExclusiveWith,
-        skill?.excludes,
-        skill?.conflictsWith,
-    ];
-
-    for (const source of sources) {
-        if (Array.isArray(source)) {
-            for (const skillId of source) {
-                if (skillId) {
-                    ids.add(skillId);
-                }
-            }
-        } else if (source) {
-            ids.add(source);
-        }
-    }
-
-    return [...ids];
-}
-
-export function hasSkillConflict(
-    character,
-    skill
-) {
-    const selectedSkillIds =
-        getSelectedSkillIds(
-            character,
-            skill?.id
+    if (Array.isArray(requirements)) {
+        const checks = requirements.map((requirement) =>
+            meetsSkillRequirement(character, requirement, skill?.id)
         );
 
-    const exclusions =
-        getMutuallyExclusiveSkillIds(skill);
-
-    if (
-        exclusions.some((skillId) =>
-            selectedSkillIds.includes(skillId)
-        )
-    ) {
-        return true;
+        return (skill?.requirementMode ?? skill?.prerequisiteMode) === 'any'
+            ? checks.length === 0 || checks.some(Boolean)
+            : checks.every(Boolean);
     }
 
-    /*
-      Also check the reverse direction.
-  
-      This means only one of the two skills needs to declare
-      the exclusion for the builder to recognize it.
-    */
-    for (const selectedSkillId of selectedSkillIds) {
-        const selectedSkill =
-            getSkillById(selectedSkillId);
-
-        if (!selectedSkill) {
-            continue;
-        }
-
-        if (
-            getMutuallyExclusiveSkillIds(
-                selectedSkill
-            ).includes(skill.id)
-        ) {
-            return true;
-        }
+    if (requirements && typeof requirements === 'object') {
+        return meetsObjectRequirements(character, requirements, skill?.id);
     }
 
     return false;
 }
 
-// =========================================================
-// OPTIONAL MODULE CHECK
-// =========================================================
+export function getMutuallyExclusiveSkillIds(skill) {
+    return [...new Set([
+        skill?.mutuallyExclusiveWith,
+        skill?.excludes,
+        skill?.conflictsWith,
+    ].flatMap((value) =>
+        Array.isArray(value) ? value : value ? [value] : []
+    ))];
+}
 
-export function isSkillModuleEnabled(
-    character,
-    skill
-) {
-    const optionalRule =
-        skill?.optionalRule ??
-        skill?.module;
+export function hasSkillConflict(character, skill) {
+    const selectedIds = getSelectedSkillIds(character, skill?.id);
 
-    if (!optionalRule) {
+    if (getMutuallyExclusiveSkillIds(skill)
+        .some((id) => selectedIds.includes(id))) {
         return true;
     }
 
-    return (
-        character?.optionalRules?.[
-        optionalRule
-        ] === true
-    );
+    return selectedIds.some((id) => {
+        const selected = getSkillById(id);
+        return selected &&
+            getMutuallyExclusiveSkillIds(selected).includes(skill?.id);
+    });
 }
 
-// =========================================================
-// SKILL ELIGIBILITY
-// =========================================================
+export function isSkillModuleEnabled(character, skill) {
+    const rule = skill?.optionalRule ?? skill?.module;
+    return !rule || character?.optionalRules?.[rule] === true;
+}
 
-export function getSkillEligibility(
-    character,
-    skill
-) {
-    const reasons = [];
-
+export function getSkillEligibility(character, skill) {
     if (!skill) {
         return {
             eligible: false,
@@ -942,37 +505,18 @@ export function getSkillEligibility(
         };
     }
 
-    if (
-        !isSkillModuleEnabled(
-            character,
-            skill
-        )
-    ) {
-        reasons.push(
-            'The optional rule required for this skill is disabled.'
-        );
+    const reasons = [];
+
+    if (!isSkillModuleEnabled(character, skill)) {
+        reasons.push('Required optional rule is disabled.');
     }
 
-    if (
-        !meetsSkillRequirements(
-            character,
-            skill
-        )
-    ) {
-        reasons.push(
-            'The character does not meet this skill’s prerequisites.'
-        );
+    if (!meetsSkillRequirements(character, skill)) {
+        reasons.push('Skill prerequisites are not met.');
     }
 
-    if (
-        hasSkillConflict(
-            character,
-            skill
-        )
-    ) {
-        reasons.push(
-            'This skill conflicts with another selected skill.'
-        );
+    if (hasSkillConflict(character, skill)) {
+        reasons.push('Conflicts with an existing skill.');
     }
 
     return {
@@ -981,137 +525,57 @@ export function getSkillEligibility(
     };
 }
 
-export function canSelectSkill(
-    character,
-    skill
-) {
-    return getSkillEligibility(
-        character,
-        skill
-    ).eligible;
+export function canSelectSkill(character, skill) {
+    return getSkillEligibility(character, skill).eligible;
 }
-
-// =========================================================
-// ELIGIBLE SKILLS
-// =========================================================
 
 export function getEligibleSkills(character) {
-    return skills.filter((skill) =>
-        canSelectSkill(
-            character,
-            skill
-        )
-    );
+    return skills.filter((skill) => canSelectSkill(character, skill));
 }
 
-// =========================================================
-// ELIGIBLE SKILLS BY CATEGORY
-// =========================================================
-
-export function getEligibleSkillsByCategory(
-    character,
-    category
-) {
-    const normalizedCategory =
-        normalizeString(category);
-
-    return getEligibleSkills(
-        character
-    ).filter(
-        (skill) =>
-            normalizeString(skill.category) ===
-            normalizedCategory
+export function getEligibleSkillsByCategory(character, category) {
+    return getEligibleSkills(character).filter(
+        (skill) => skill.category?.toLowerCase() ===
+            category?.toLowerCase()
     );
 }
-
-// =========================================================
-// SKILL VALIDATION
-// =========================================================
-//
-// Checks skills already present on the character.
-//
-// This is useful when something else changes:
-//
-// - Level
-// - Movement Type
-// - Weapon proficiency
-// - Optional rules
-// - Another selected skill
-//
-// The builder can then warn the user that an existing
-// selection no longer meets its requirements.
-// =========================================================
 
 export function validateSelectedSkills(character) {
-    const results = [];
-
-    for (const skillId of getSelectedSkillIds(
-        character
-    )) {
+    return getSelectedSkillIds(character).map((skillId) => {
         const skill = getSkillById(skillId);
-
-        if (!skill) {
-            results.push({
-                skillId,
-                skill: null,
-                eligible: false,
-                reasons: ['Skill not found.'],
-            });
-
-            continue;
-        }
-
-        const eligibility =
-            getSkillEligibility(
-                character,
-                skill
-            );
-
-        results.push({
+        return {
             skillId,
             skill,
-            ...eligibility,
-        });
-    }
-
-    return results;
+            ...getSkillEligibility(character, skill),
+        };
+    });
 }
 
 export default {
     getSelectedSkillIds,
     getSelectedSkills,
     hasSkill,
-
     hasWeaponProficiency,
     hasAnyWeaponProficiency,
     hasAllWeaponProficiencies,
-    hasEffectiveWeaponProficiency,
-
-    hasMovementType,
-
     getActiveSkillEffects,
+    hasSkillEffect,
     getSkillGrantedWeaponProficiencies,
-
-    getMovementSkillLevelOffset,
+    hasEffectiveWeaponProficiency,
+    hasMovementType,
     getSkillLevelOffset,
+    getMovementSkillLevelOffset,
     getEffectiveSkillLevel,
-
     getSkillGrantedTraits,
     getTraitsForSkillEligibility,
-
     meetsSkillRequirement,
     meetsSkillRequirements,
-
     getMutuallyExclusiveSkillIds,
     hasSkillConflict,
-
     isSkillModuleEnabled,
-
     getSkillEligibility,
     canSelectSkill,
-
     getEligibleSkills,
     getEligibleSkillsByCategory,
-
     validateSelectedSkills,
 };
