@@ -77,17 +77,31 @@ export default function SkillsStep({ character, updateCharacter }) {
         personalSkill: null,
     };
 
+
     const selectableSkills = skills
         .filter((skill) => {
-            // Movement skills use their own dedicated slot.
-            if (skill.category === 'movement') return false;
+            // A skill cannot occupy both starting skill slots.
+            if (skill.id === selectedMovementSkill) {
+                return false;
+            }
 
+            // Personal skills have their own filter.
             if (category === 'personal') {
                 return skill.category === 'personal';
             }
 
+            // Combat Arts can be selected if eligible.
+            if (category === 'combat-art') {
+                return skill.category === 'combat-art';
+            }
+
+            // Regular includes movement-restricted skills,
+            // provided they meet their prerequisites.
             if (category === 'regular') {
-                return skill.category !== 'personal';
+                return (
+                    skill.category !== 'personal' &&
+                    skill.category !== 'combat-art'
+                );
             }
 
             return true;

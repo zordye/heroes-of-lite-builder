@@ -551,6 +551,54 @@ export function validateSelectedSkills(character) {
     });
 }
 
+
+export function clearIneligibleSelectedSkills(character) {
+    if (!character) return character;
+
+    const updatedSlots = {
+        ...(character.skillSlots ?? {}),
+    };
+
+    // Check each selected skill without allowing that skill
+    // to satisfy its own prerequisites.
+    for (const [slot, skillId] of Object.entries(updatedSlots)) {
+        if (!skillId) continue;
+
+        // Movement skills are granted separately by movement type.
+        // They are validated by the Movement step.
+        if (slot === 'movement') continue;
+
+        const skill = getSkillById(skillId);
+
+        if (!skill) {
+            updatedSlots[slot] = null;
+            continue;
+        }
+
+        const testCharacter = {
+            ...character,
+            skillSlots: {
+                ...updatedSlots,
+                [slot]: null,
+            },
+            personalSkill:
+                character.personalSkill === skillId
+                    ? null
+                    : character.personalSkill,
+        };
+
+        if (!getSkillEligibility(testCharacter, skill).eligible) {
+            updatedSlots[slot] = null;
+        }
+    }
+
+    return {
+        ...character,
+        skillSlots: updatedSlots,
+    };
+}
+
+
 export default {
     getSelectedSkillIds,
     getSelectedSkills,
@@ -578,4 +626,5 @@ export default {
     getEligibleSkills,
     getEligibleSkillsByCategory,
     validateSelectedSkills,
+    clearIneligibleSelectedSkills
 };
