@@ -8,7 +8,13 @@ import {
   getOutOfCombatPointsRemaining,
 } from '../../rules/statCalculations';
 
-import { clearIneligibleSelectedSkills } from '../../rules/skillEligibility';
+import {
+  clearIneligibleSelectedSkills,
+} from '../../rules/skillEligibility';
+
+import {
+  validPerformSelection,
+} from '../../rules/sheetModifiers';
 
 import { movementTypes } from '../../data/movementTypes';
 import { skills } from '../../data/skills';
@@ -45,16 +51,61 @@ const nextLabels = [
   'Continue to review →',
 ];
 
-export default function CharacterCreation() {
+const performSkill = skills.find(
+  (skill) => skill.name.toLowerCase() === 'perform'
+);
+
+// =========================================================
+// PERFORM VALIDATION
+// =========================================================
+
+function getPerformValidationError(character) {
+  const learnedSkillIds = [
+    ...Object.values(character.skillSlots ?? {}),
+    ...(character.additionalSkills ?? []),
+  ];
+
+  const hasPerform =
+    Boolean(performSkill) &&
+    learnedSkillIds.some((selected) => {
+      const id =
+        typeof selected === 'string'
+          ? selected
+          : selected?.id;
+
+      return id === performSkill.id;
+    });
+
+  if (!hasPerform) {
+    return '';
+  }
+
+  if (!validPerformSelection(character.performStats)) {
+    return (
+      'Perform requires exactly four different combat ' +
+      'stats to receive a permanent -2 penalty.'
+    );
+  }
+
+  return '';
+}
+
+// =========================================================
+// CHARACTER CREATION
+// =========================================================
+
+export default function CharacterCreation({ onComplete }) {
   // --------------------------------------------------
   // Character state
   // --------------------------------------------------
 
-  const [character, setCharacterState] = useState(createCharacter);
+  const [character, setCharacterState] = useState(
+    createCharacter
+  );
 
-  // Validate selected skills whenever the character changes.
-  // This prevents characters from retaining skills whose
-  // prerequisites are no longer satisfied.
+  // Validate selected skills whenever the character
+  // changes, preventing ineligible skills from remaining.
+
   const setCharacter = (update) => {
     setCharacterState((previous) => {
       const next =
@@ -74,7 +125,8 @@ export default function CharacterCreation() {
   const [error, setError] = useState('');
   const [completed, setCompleted] = useState(false);
 
-  // Scroll to the top whenever the creation step changes.
+  // Scroll to the top whenever the step changes.
+
   useEffect(() => {
     window.scrollTo({
       top: 0,
@@ -88,14 +140,18 @@ export default function CharacterCreation() {
 
   const goNext = () => {
     // Step 1: Basic information
+
     if (stepIndex === 0) {
       if (!character.name?.trim()) {
-        setError('Please enter a character name to continue.');
+        setError(
+          'Please enter a character name to continue.'
+        );
         return;
       }
     }
 
     // Step 2: Movement type
+
     if (stepIndex === 1) {
       if (!character.movementType) {
         setError('Please choose a movement type.');
@@ -109,37 +165,52 @@ export default function CharacterCreation() {
     }
 
     // Step 3: Weapon proficiency
+
     if (stepIndex === 2) {
       if (
         !character.weaponProficiencies?.length ||
         !character.equippedWeaponId
       ) {
-        setError('Please choose a starting weapon proficiency.');
+        setError(
+          'Please choose a starting weapon proficiency.'
+        );
         return;
       }
     }
 
     // Step 4: Stats
+
     if (stepIndex === 3) {
-      if (getStartingStatPointsRemaining(character) !== 0) {
-        setError('Please allocate all 12 combat stat points.');
+      if (
+        getStartingStatPointsRemaining(character) !== 0
+      ) {
+        setError(
+          'Please allocate all 12 combat stat points.'
+        );
         return;
       }
 
-      if (getOutOfCombatPointsRemaining(character) !== 0) {
-        setError('Please allocate all 6 out-of-combat stat points.');
+      if (
+        getOutOfCombatPointsRemaining(character) !== 0
+      ) {
+        setError(
+          'Please allocate all 6 out-of-combat stat points.'
+        );
         return;
       }
     }
 
     // Step 5: Skills
+
     if (stepIndex === 4) {
       const movement = movementTypes.find(
-        (type) => type.id === character.movementType
+        (type) =>
+          type.id === character.movementType
       );
 
-      // Fixed movement skills, such as Canter, must be
-      // recorded in the character's movement skill slot.
+      // Fixed movement skills, such as Canter,
+      // must be recorded in the movement skill slot.
+
       const fixedMovementSkillId =
         movement?.bonusSkillType === 'fixed'
           ? skills.find(
@@ -154,22 +225,39 @@ export default function CharacterCreation() {
         character.skillSlots?.movement;
 
       if (!movementSkillId) {
-        setError('Please choose your starting movement skill.');
+        setError(
+          'Please choose your starting movement skill.'
+        );
         return;
       }
 
       if (!character.skillSlots?.level1) {
-        setError('Please choose your level-one skill.');
+        setError(
+          'Please choose your level-one skill.'
+        );
+        return;
+      }
+
+      // Perform must have four distinct stat penalties
+      // before the player can leave the Skills step.
+
+      const performError =
+        getPerformValidationError(character);
+
+      if (performError) {
+        setError(performError);
         return;
       }
 
       // Grant starting resources once.
       // Navigating backward and forward must not
       // duplicate the starting Herb or reset Gold.
+
       setCharacter((previous) => {
-        const hasStartingHerb = previous.inventory?.some(
-          (item) => item.id === 'starting-herb'
-        );
+        const hasStartingHerb =
+          previous.inventory?.some(
+            (item) => item.id === 'starting-herb'
+          );
 
         const startingHerb = createInventoryItem(
           'herb',
@@ -259,12 +347,14 @@ export default function CharacterCreation() {
 
   const finishCharacter = () => {
     // Basic information
+
     if (!character.name?.trim()) {
       setError('A character name is required.');
       return;
     }
 
     // Movement and support
+
     if (
       !character.movementType ||
       !character.supportType
@@ -276,6 +366,7 @@ export default function CharacterCreation() {
     }
 
     // Weapon proficiency and starting weapon
+
     if (
       !character.weaponProficiencies?.length ||
       !character.equippedWeaponId
@@ -285,6 +376,7 @@ export default function CharacterCreation() {
     }
 
     // Stat allocation
+
     if (
       getStartingStatPointsRemaining(character) !== 0 ||
       getOutOfCombatPointsRemaining(character) !== 0
@@ -296,6 +388,7 @@ export default function CharacterCreation() {
     }
 
     // Starting skills
+
     if (
       !character.skillSlots?.movement ||
       !character.skillSlots?.level1
@@ -306,7 +399,20 @@ export default function CharacterCreation() {
       return;
     }
 
+    // Perform validation is repeated here so a player
+    // cannot finish with an incomplete selection,
+    // including after returning from the Review step.
+
+    const performError =
+      getPerformValidationError(character);
+
+    if (performError) {
+      setError(performError);
+      return;
+    }
+
     // Starting resources
+
     const hasStartingHerb =
       character.inventory?.some(
         (item) => item.id === 'starting-herb'
@@ -321,8 +427,14 @@ export default function CharacterCreation() {
 
     // Character creation is complete.
     // Permanent saving will be implemented later.
+
     setError('');
-    setCompleted(true);
+
+    if (onComplete) {
+      onComplete(character);
+    } else {
+      setCompleted(true);
+    }
   };
 
   // --------------------------------------------------
@@ -453,6 +565,7 @@ export default function CharacterCreation() {
 
       <div className="creation-layout">
         {/* Step navigation */}
+
         <nav
           className="step-nav"
           aria-label="Character creation steps"
@@ -485,10 +598,12 @@ export default function CharacterCreation() {
         </nav>
 
         {/* Active step */}
+
         <div className="creation-content">
           {renderStep()}
 
           {/* Validation errors */}
+
           {error && (
             <p
               className="creation-error"
@@ -499,6 +614,7 @@ export default function CharacterCreation() {
           )}
 
           {/* Navigation buttons */}
+
           <footer className="creation-actions">
             <button
               type="button"

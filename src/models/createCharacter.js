@@ -284,6 +284,15 @@ export default function createCharacter() {
     */
     additionalSkills: [],
 
+
+    performStats: [],
+
+    combatModifiers: {
+      weaponMatchup: 'neutral',
+      rallies: [],
+    },
+
+
     // =====================================================
     // PERSONAL SKILL
     // =====================================================
